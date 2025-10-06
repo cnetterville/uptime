@@ -19,23 +19,33 @@ struct UptimeApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusItem: NSStatusItem?
-    var popover: NSPopover?
+    var preferencesWindow: NSWindow?
+    var preferencesWindowController: NSWindowController?
+    var historyWindow: NSWindow?
+    var historyWindowController: NSWindowController?
     private var uptimeManager = UptimeManager()
-    private var cancellable: AnyCancellable?
+    private var cancellables = Set<AnyCancellable>()
+    
+    deinit {
+        // Ensure proper cleanup
+        cancellables.removeAll()
+        uptimeManager.stopUpdating()
+        print("AppDelegate deallocated")
+    }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide the dock icon since this is a menubar-only app
         NSApp.setActivationPolicy(.accessory)
         
-        // Create the status item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Set default preferences if not set
+        registerDefaults()
+        
+        // Create the status item with fixed length to prevent jitter
+        statusItem = NSStatusBar.system.statusItem(withLength: 100)
         
         if let button = statusItem?.button {
-            button.action = #selector(statusBarButtonClicked)
-            button.target = self
-            
             // Set initial title with monospaced font
             button.title = uptimeManager.compactUptime
             button.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
@@ -45,30 +55,117 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         uptimeManager.startUpdating()
         
         // Subscribe to uptime changes to update the menubar (throttled to reduce jitter)
-        cancellable = uptimeManager.$uptimeSeconds
+        // Using weak self to prevent retain cycle
+        uptimeManager.$uptimeSeconds
             .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 self?.updateStatusBarTitle()
             }
+            .store(in: &cancellables)
         
-        // Create the popover
-        popover = NSPopover()
-        popover?.contentSize = NSSize(width: 340, height: 200)
-        popover?.behavior = .transient
-        popover?.contentViewController = NSHostingController(rootView: UptimeMenuView())
+        // Set up the context menu
+        setupContextMenu()
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Clean up resources before app terminates
+        uptimeManager.stopUpdating()
+        cancellables.removeAll()
+    }
+    
+    private func registerDefaults() {
+        UserDefaults.standard.register(defaults: [
+            "launchAtLogin": false,
+            "updateFrequency": 1.0,
+            "showArrow": true,
+            "milestoneNotifications": true,
+            "timeUnitFormat": TimeUnit.automatic.rawValue,
+            "showMinutesInMenubar": true,
+            "use24HourFormat": false
+        ])
+    }
+    
+    private func setupContextMenu() {
+        let menu = NSMenu()
+        
+        let historyItem = NSMenuItem(title: "Uptime History...", action: #selector(openHistory), keyEquivalent: "h")
+        historyItem.target = self
+        menu.addItem(historyItem)
+        
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: "Quit Uptime", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
+        statusItem?.menu = menu
     }
     
     private func updateStatusBarTitle() {
         statusItem?.button?.title = uptimeManager.compactUptime
     }
     
-    @objc func statusBarButtonClicked() {
-        guard let button = statusItem?.button else { return }
+    @objc func openHistory() {
+        if historyWindowController == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+                styleMask: [.titled, .closable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "Uptime History"
+            window.contentViewController = NSHostingController(rootView: UptimeHistoryView())
+            window.center()
+            
+            historyWindowController = NSWindowController(window: window)
+            historyWindow = window
+            
+            // Handle window closing
+            window.delegate = self
+        }
         
-        if popover?.isShown == true {
-            popover?.performClose(nil)
-        } else {
-            popover?.show(relativeTo: button.bounds, of: button, preferredEdge: NSRectEdge.minY)
+        historyWindowController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc func openPreferences() {
+        if preferencesWindowController == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 450, height: 500),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "Uptime Preferences"
+            window.contentViewController = NSHostingController(rootView: PreferencesView())
+            window.center()
+            
+            preferencesWindowController = NSWindowController(window: window)
+            preferencesWindow = window
+            
+            // Handle window closing
+            window.delegate = self
+        }
+        
+        preferencesWindowController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc func quitApp() {
+        NSApplication.shared.terminate(nil)
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        if notification.object as? NSWindow == preferencesWindow {
+            preferencesWindowController = nil
+            preferencesWindow = nil
+        } else if notification.object as? NSWindow == historyWindow {
+            historyWindowController = nil
+            historyWindow = nil
         }
     }
 }

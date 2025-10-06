@@ -1,46 +1,65 @@
 import Foundation
 import SwiftUI
 import Combine
+import UserNotifications
 
 class UptimeManager: ObservableObject {
     @Published var uptimeSeconds: TimeInterval = 0
     @Published var bootDate: Date = Date()
     
     private var timer: Timer?
+    private var lastMilestoneNotified: TimeInterval = 0
+    private var historyManager = UptimeHistoryManager()
+    
+    // Milestones in seconds
+    private let milestones: [TimeInterval] = [
+        86400,      // 1 day
+        604800,     // 1 week
+        2592000,    // 1 month (30 days)
+        7776000,    // 3 months
+        15552000,   // 6 months
+        31536000    // 1 year
+    ]
     
     var formattedUptime: String {
-        let days = Int(uptimeSeconds) / 86400
-        let hours = (Int(uptimeSeconds) % 86400) / 3600
-        let minutes = (Int(uptimeSeconds) % 3600) / 60
-        let seconds = Int(uptimeSeconds) % 60
+        let timeFormat = TimeUnit(rawValue: UserDefaults.standard.string(forKey: "timeUnitFormat") ?? "automatic") ?? .automatic
         
-        if days > 0 {
-            return String(format: "%dd %02dh %02dm %02ds", days, hours, minutes, seconds)
-        } else if hours > 0 {
-            return String(format: "%02dh %02dm %02ds", hours, minutes, seconds)
-        } else {
-            return String(format: "%02dm %02ds", minutes, seconds)
-        }
+        return formatTime(
+            uptime: uptimeSeconds,
+            format: timeFormat,
+            includeSeconds: false,
+            includeMinutes: true,
+            isCompact: false
+        )
     }
     
     var compactUptime: String {
-        let days = Int(uptimeSeconds) / 86400
-        let hours = (Int(uptimeSeconds) % 86400) / 3600
-        let minutes = (Int(uptimeSeconds) % 3600) / 60
+        let showArrow = UserDefaults.standard.object(forKey: "showArrow") as? Bool ?? true
+        let showMinutes = UserDefaults.standard.object(forKey: "showMinutesInMenubar") as? Bool ?? true
+        let timeFormat = TimeUnit(rawValue: UserDefaults.standard.string(forKey: "timeUnitFormat") ?? "automatic") ?? .automatic
+        let arrow = showArrow ? "↑" : ""
         
-        if days > 0 {
-            return String(format: " ↑%dd %dh %dm", days, hours, minutes)
-        } else if hours > 0 {
-            return String(format: " ↑%dh %dm", hours, minutes)
-        } else {
-            return String(format: " ↑%dm", minutes)
-        }
+        return formatTime(
+            uptime: uptimeSeconds,
+            format: timeFormat,
+            includeSeconds: false,
+            includeMinutes: showMinutes,
+            isCompact: true,
+            arrow: arrow
+        )
     }
     
     var bootTime: String {
+        let use24Hour = UserDefaults.standard.object(forKey: "use24HourFormat") as? Bool ?? false
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         formatter.timeStyle = .short
+        
+        if use24Hour {
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "M/d/yy, HH:mm"
+        }
+        
         return formatter.string(from: bootDate)
     }
     
@@ -50,13 +69,37 @@ class UptimeManager: ObservableObject {
         return hourProgress
     }
     
+    var longestUptimeSession: String {
+        guard let longest = historyManager.longestSession else { return "N/A" }
+        return longest.formattedDuration
+    }
+    
     init() {
         updateUptime()
+        requestNotificationPermission()
+    }
+    
+    deinit {
+        // Ensure timer is cleaned up
+        stopUpdating()
+        print("UptimeManager deallocated")
     }
     
     func startUpdating() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            self.updateUptime()
+        // Stop any existing timer first
+        stopUpdating()
+        
+        let frequency = UserDefaults.standard.double(forKey: "updateFrequency")
+        let interval = frequency > 0 ? frequency : 1.0
+        
+        // Use weak self to prevent retain cycle
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            self?.updateUptime()
+        }
+        
+        // Add to run loop to ensure it works properly
+        if let timer = timer {
+            RunLoop.current.add(timer, forMode: .common)
         }
     }
     
@@ -69,6 +112,10 @@ class UptimeManager: ObservableObject {
         updateUptime()
     }
     
+    func getHistoryManager() -> UptimeHistoryManager {
+        return historyManager
+    }
+    
     private func updateUptime() {
         var boottime = timeval()
         var size = MemoryLayout<timeval>.size
@@ -76,6 +123,131 @@ class UptimeManager: ObservableObject {
         if sysctlbyname("kern.boottime", &boottime, &size, nil, 0) == 0 {
             bootDate = Date(timeIntervalSince1970: TimeInterval(boottime.tv_sec))
             uptimeSeconds = Date().timeIntervalSince(bootDate)
+            
+            // Track this session in history
+            historyManager.trackCurrentSession(bootDate: bootDate, currentUptime: uptimeSeconds)
+            
+            // Check for milestones
+            checkMilestones()
+        }
+    }
+    
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+    
+    private func checkMilestones() {
+        let notificationsEnabled = UserDefaults.standard.object(forKey: "milestoneNotifications") as? Bool ?? true
+        guard notificationsEnabled else { return }
+        
+        for milestone in milestones {
+            if uptimeSeconds >= milestone && lastMilestoneNotified < milestone {
+                sendMilestoneNotification(for: milestone)
+                lastMilestoneNotified = milestone
+                break // Only send one notification at a time
+            }
+        }
+    }
+    
+    private func sendMilestoneNotification(for milestone: TimeInterval) {
+        let content = UNMutableNotificationContent()
+        content.title = "Uptime Milestone Reached! 🎉"
+        content.body = "Your system has been running for \(formatMilestone(milestone))"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: "milestone-\(milestone)",
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    private func formatMilestone(_ seconds: TimeInterval) -> String {
+        let days = Int(seconds) / 86400
+        
+        if days >= 365 {
+            return "1 year"
+        } else if days >= 180 {
+            return "6 months"
+        } else if days >= 90 {
+            return "3 months"
+        } else if days >= 30 {
+            return "1 month"
+        } else if days >= 7 {
+            return "1 week"
+        } else {
+            return "1 day"
+        }
+    }
+    
+    private func formatTime(uptime: TimeInterval, format: TimeUnit, includeSeconds: Bool, includeMinutes: Bool, isCompact: Bool, arrow: String = "") -> String {
+        let days = Int(uptime) / 86400
+        let hours = (Int(uptime) % 86400) / 3600
+        let minutes = (Int(uptime) % 3600) / 60
+        let seconds = Int(uptime) % 60
+        
+        let space = (isCompact && format == .compactFormat) ? "" : " "
+        let prefix = arrow.isEmpty ? (isCompact ? " " : "") : (isCompact ? " \(arrow)" : "")
+        
+        switch format {
+        case .automatic:
+            if days > 0 {
+                if includeSeconds {
+                    return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+                }
+            } else if hours > 0 {
+                if includeSeconds {
+                    return "\(prefix)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+                }
+            } else {
+                if includeSeconds {
+                    return "\(prefix)\(String(format: "%02d", minutes))m\(space)\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(String(format: "%02d", minutes))m"
+                }
+            }
+            
+        case .alwaysShowDays:
+            if includeSeconds {
+                return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
+            } else {
+                return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+            }
+            
+        case .alwaysShowHours:
+            let totalHours = days * 24 + hours
+            if includeSeconds {
+                return "\(prefix)\(String(format: "%02d", totalHours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
+            } else {
+                return "\(prefix)\(String(format: "%02d", totalHours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+            }
+            
+        case .compactFormat:
+            if days > 0 {
+                if includeSeconds {
+                    return "\(prefix)\(days)d\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(days)d\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+                }
+            } else if hours > 0 {
+                if includeSeconds {
+                    return "\(prefix)\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
+                }
+            } else {
+                if includeSeconds {
+                    return "\(prefix)\(String(format: "%02d", minutes))m\(String(format: "%02d", seconds))s"
+                } else {
+                    return "\(prefix)\(String(format: "%02d", minutes))m"
+                }
+            }
         }
     }
 }
