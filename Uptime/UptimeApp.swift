@@ -25,6 +25,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var preferencesWindowController: NSWindowController?
     var historyWindow: NSWindow?
     var historyWindowController: NSWindowController?
+    var aboutWindow: NSWindow?
+    var aboutWindowController: NSWindowController?
     private var uptimeManager = UptimeManager()
     private var cancellables = Set<AnyCancellable>()
     
@@ -88,6 +90,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func setupContextMenu() {
         let menu = NSMenu()
         
+        let aboutItem = NSMenuItem(title: "About Uptime", action: #selector(openAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         let historyItem = NSMenuItem(title: "Uptime History...", action: #selector(openHistory), keyEquivalent: "h")
         historyItem.target = self
         menu.addItem(historyItem)
@@ -118,7 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 defer: false
             )
             window.title = "Uptime History"
-            window.contentViewController = NSHostingController(rootView: UptimeHistoryView())
+            window.contentViewController = NSHostingController(rootView: UptimeHistoryView(historyManager: uptimeManager.getHistoryManager()))
             window.center()
             
             historyWindowController = NSWindowController(window: window)
@@ -155,6 +163,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    @objc func openAbout() {
+        if aboutWindowController == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 350, height: 450),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "About Uptime"
+            window.contentViewController = NSHostingController(rootView: AboutView())
+            window.center()
+            
+            aboutWindowController = NSWindowController(window: window)
+            aboutWindow = window
+            
+            // Handle window closing
+            window.delegate = self
+        }
+        
+        aboutWindowController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
     @objc func quitApp() {
         NSApplication.shared.terminate(nil)
     }
@@ -166,6 +197,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } else if notification.object as? NSWindow == historyWindow {
             historyWindowController = nil
             historyWindow = nil
+        } else if notification.object as? NSWindow == aboutWindow {
+            aboutWindowController = nil
+            aboutWindow = nil
         }
     }
 }

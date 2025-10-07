@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct UptimeHistoryView: View {
-    @StateObject private var historyManager = UptimeHistoryManager()
+    @ObservedObject var historyManager: UptimeHistoryManager
     @State private var showingExportSheet = false
     @State private var exportedData = ""
     
@@ -161,6 +161,7 @@ struct StatCard: View {
 struct SessionRow: View {
     let session: UptimeSession
     let isLongest: Bool
+    @State private var isPulsing = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -207,7 +208,11 @@ struct SessionRow: View {
                     Image(systemName: "circle.fill")
                         .font(.caption)
                         .foregroundStyle(.green)
-                        .symbolEffect(.pulse)
+                        .opacity(isPulsing ? 0.5 : 1.0)
+                        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isPulsing)
+                        .onAppear {
+                            isPulsing = true
+                        }
                 } else {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
@@ -245,7 +250,7 @@ struct ExportSheet: View {
             }
             
             ScrollView {
-                Text(data)
+                Text(data.isEmpty ? "No data to export" : data)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,7 +260,7 @@ struct ExportSheet: View {
             
             Button("Copy to Clipboard") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(data, forType: .string)
+                NSPasteboard.general.setString(data.isEmpty ? "No data to export" : data, forType: .string)
             }
             .buttonStyle(.borderedProminent)
         }
@@ -265,5 +270,5 @@ struct ExportSheet: View {
 }
 
 #Preview {
-    UptimeHistoryView()
+    UptimeHistoryView(historyManager: UptimeHistoryManager())
 }

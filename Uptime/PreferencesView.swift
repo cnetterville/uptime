@@ -37,9 +37,7 @@ struct PreferencesView: View {
                     // Startup section
                     PreferenceSection(title: "Startup") {
                         Toggle("Launch at login", isOn: $launchAtLogin)
-                            .onChange(of: launchAtLogin) { _, newValue in
-                                setLaunchAtLogin(enabled: newValue)
-                            }
+                            .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
                     }
                     
                     // Display section
@@ -149,11 +147,20 @@ struct PreferencesView: View {
         .background(.ultraThinMaterial)
     }
     
-    private func setLaunchAtLogin(enabled: Bool) {
-        if enabled {
-            try? SMAppService.mainApp.register()
-        } else {
-            try? SMAppService.mainApp.unregister()
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if #available(macOS 13.0, *) {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } else {
+                // Fallback for older versions
+                print("Launch at login requires macOS 13.0 or later")
+            }
+        } catch {
+            print("Error setting launch at login: \(error.localizedDescription)")
         }
     }
     

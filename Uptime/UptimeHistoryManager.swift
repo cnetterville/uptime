@@ -9,11 +9,19 @@ import Foundation
 import Combine
 
 struct UptimeSession: Codable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let bootDate: Date
     let endDate: Date?
     let duration: TimeInterval
     let isCurrentSession: Bool
+    
+    init(bootDate: Date, endDate: Date?, duration: TimeInterval, isCurrentSession: Bool) {
+        self.id = UUID()
+        self.bootDate = bootDate
+        self.endDate = endDate
+        self.duration = duration
+        self.isCurrentSession = isCurrentSession
+    }
     
     var formattedDuration: String {
         let days = Int(duration) / 86400

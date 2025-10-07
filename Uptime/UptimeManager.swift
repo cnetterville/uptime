@@ -120,20 +120,30 @@ class UptimeManager: ObservableObject {
         var boottime = timeval()
         var size = MemoryLayout<timeval>.size
         
-        if sysctlbyname("kern.boottime", &boottime, &size, nil, 0) == 0 {
-            bootDate = Date(timeIntervalSince1970: TimeInterval(boottime.tv_sec))
-            uptimeSeconds = Date().timeIntervalSince(bootDate)
-            
-            // Track this session in history
-            historyManager.trackCurrentSession(bootDate: bootDate, currentUptime: uptimeSeconds)
-            
-            // Check for milestones
-            checkMilestones()
+        guard sysctlbyname("kern.boottime", &boottime, &size, nil, 0) == 0 else {
+            print("Error: Failed to retrieve system boot time")
+            return
         }
+        
+        bootDate = Date(timeIntervalSince1970: TimeInterval(boottime.tv_sec))
+        uptimeSeconds = Date().timeIntervalSince(bootDate)
+        
+        // Track this session in history
+        historyManager.trackCurrentSession(bootDate: bootDate, currentUptime: uptimeSeconds)
+        
+        // Check for milestones
+        checkMilestones()
     }
     
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("Error requesting notification permission: \(error.localizedDescription)")
+            }
+            if granted {
+                print("Notification permission granted")
+            }
+        }
     }
     
     private func checkMilestones() {
@@ -161,7 +171,11 @@ class UptimeManager: ObservableObject {
             trigger: nil
         )
         
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling notification: \(error.localizedDescription)")
+            }
+        }
     }
     
     private func formatMilestone(_ seconds: TimeInterval) -> String {
