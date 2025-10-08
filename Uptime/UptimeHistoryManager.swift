@@ -141,7 +141,23 @@ class UptimeHistoryManager: ObservableObject {
         saveSessions()
     }
     
-    func exportHistory() -> String {
+    func exportHistory(format: ExportFormat = .csv) -> String {
+        switch format {
+        case .csv:
+            return exportCSV()
+        case .json:
+            return exportJSON()
+        case .markdown:
+            return exportMarkdown()
+        }
+    }
+    
+    func saveCurrentSession() {
+        // Force save any pending changes
+        saveSessions()
+    }
+    
+    private func exportCSV() -> String {
         var csv = "Boot Date,End Date,Duration (seconds),Duration (formatted),Status\n"
         
         for session in sessions.sorted(by: { $0.bootDate > $1.bootDate }) {
@@ -152,5 +168,55 @@ class UptimeHistoryManager: ObservableObject {
         }
         
         return csv
+    }
+    
+    private func exportJSON() -> String {
+        let exportData = sessions.map { session in
+            [
+                "id": session.id.uuidString,
+                "bootDate": session.bootDate.ISO8601Format(),
+                "endDate": session.endDate?.ISO8601Format() ?? "Current",
+                "duration": session.duration,
+                "formattedDuration": session.formattedDuration,
+                "isCurrentSession": session.isCurrentSession
+            ]
+        }
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: exportData, options: .prettyPrinted),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+        return "{}"
+    }
+    
+    private func exportMarkdown() -> String {
+        var markdown = "# Uptime History\n\n"
+        markdown += "| Boot Date | End Date | Duration | Status |\n"
+        markdown += "|-----------|----------|----------|--------|\n"
+        
+        for session in sessions.sorted(by: { $0.bootDate > $1.bootDate }) {
+            let endDate = session.endDate?.formatted(date: .abbreviated, time: .shortened) ?? "Current"
+            let status = session.isCurrentSession ? "🟢 Current" : "✅ Completed"
+            
+            markdown += "| \(session.formattedBootDate) | \(endDate) | \(session.formattedDuration) | \(status) |\n"
+        }
+        
+        return markdown
+    }
+}
+
+enum ExportFormat: String, CaseIterable, Identifiable {
+    case csv = "csv"
+    case json = "json"
+    case markdown = "markdown"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .csv: return "CSV"
+        case .json: return "JSON"
+        case .markdown: return "Markdown"
+        }
     }
 }

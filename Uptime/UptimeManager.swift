@@ -29,7 +29,21 @@ class UptimeManager: ObservableObject {
             format: timeFormat,
             includeSeconds: false,
             includeMinutes: true,
-            isCompact: false
+            isCompact: false,
+            forceSpaces: false
+        )
+    }
+    
+    var detailedUptime: String {
+        let timeFormat = TimeUnit(rawValue: UserDefaults.standard.string(forKey: "timeUnitFormat") ?? "automatic") ?? .automatic
+        
+        return formatTime(
+            uptime: uptimeSeconds,
+            format: timeFormat,
+            includeSeconds: true,
+            includeMinutes: true,
+            isCompact: false,
+            forceSpaces: false
         )
     }
     
@@ -37,16 +51,34 @@ class UptimeManager: ObservableObject {
         let showArrow = UserDefaults.standard.object(forKey: "showArrow") as? Bool ?? true
         let showMinutes = UserDefaults.standard.object(forKey: "showMinutesInMenubar") as? Bool ?? true
         let timeFormat = TimeUnit(rawValue: UserDefaults.standard.string(forKey: "timeUnitFormat") ?? "automatic") ?? .automatic
+        let menubarStyle = MenubarStyle(rawValue: UserDefaults.standard.string(forKey: "menubarStyle") ?? "compact") ?? .compact
         let arrow = showArrow ? "↑" : ""
+        
+        // Apply menubar style settings
+        let (includeSeconds, includeMinutes, useSpaces) = getStyleSettings(for: menubarStyle, showMinutes: showMinutes)
         
         return formatTime(
             uptime: uptimeSeconds,
             format: timeFormat,
-            includeSeconds: false,
-            includeMinutes: showMinutes,
+            includeSeconds: includeSeconds,
+            includeMinutes: includeMinutes,
             isCompact: true,
-            arrow: arrow
+            arrow: arrow,
+            forceSpaces: useSpaces
         )
+    }
+    
+    private func getStyleSettings(for style: MenubarStyle, showMinutes: Bool) -> (includeSeconds: Bool, includeMinutes: Bool, useSpaces: Bool) {
+        switch style {
+        case .compact:
+            return (false, showMinutes, false)
+        case .normal:
+            return (false, showMinutes, true)
+        case .detailed:
+            return (true, true, false)
+        case .minimal:
+            return (false, false, false)
+        }
     }
     
     var bootTime: String {
@@ -80,9 +112,11 @@ class UptimeManager: ObservableObject {
     }
     
     deinit {
-        // Ensure timer is cleaned up
+        // Ensure proper cleanup with more detailed logging
+        print("UptimeManager: Starting cleanup...")
         stopUpdating()
-        print("UptimeManager deallocated")
+        historyManager.saveCurrentSession() // Ensure current session is saved
+        print("UptimeManager: Cleanup completed")
     }
     
     func startUpdating() {
@@ -90,17 +124,19 @@ class UptimeManager: ObservableObject {
         stopUpdating()
         
         let frequency = UserDefaults.standard.double(forKey: "updateFrequency")
-        let interval = frequency > 0 ? frequency : 1.0
+        let interval = max(frequency, 0.5) // Minimum 0.5 seconds to prevent excessive updates
         
         // Use weak self to prevent retain cycle
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.updateUptime()
         }
         
-        // Add to run loop to ensure it works properly
+        // Add to run loop with higher priority for better accuracy
         if let timer = timer {
             RunLoop.current.add(timer, forMode: .common)
         }
+        
+        print("UptimeManager: Started updating every \(interval) seconds")
     }
     
     func stopUpdating() {
@@ -196,13 +232,20 @@ class UptimeManager: ObservableObject {
         }
     }
     
-    private func formatTime(uptime: TimeInterval, format: TimeUnit, includeSeconds: Bool, includeMinutes: Bool, isCompact: Bool, arrow: String = "") -> String {
+    private func formatTime(uptime: TimeInterval, format: TimeUnit, includeSeconds: Bool, includeMinutes: Bool, isCompact: Bool, arrow: String = "", forceSpaces: Bool = false) -> String {
         let days = Int(uptime) / 86400
         let hours = (Int(uptime) % 86400) / 3600
         let minutes = (Int(uptime) % 3600) / 60
         let seconds = Int(uptime) % 60
         
-        let space = (isCompact && format == .compactFormat) ? "" : " "
+        // Determine spacing based on style
+        let space: String
+        if forceSpaces {
+            space = " "
+        } else {
+            space = (isCompact || format == .compactFormat) ? "" : " "
+        }
+        
         let prefix = arrow.isEmpty ? (isCompact ? " " : "") : (isCompact ? " \(arrow)" : "")
         
         switch format {
@@ -243,6 +286,7 @@ class UptimeManager: ObservableObject {
             }
             
         case .compactFormat:
+            // CompactFormat always uses no spaces regardless of forceSpaces
             if days > 0 {
                 if includeSeconds {
                     return "\(prefix)\(days)d\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")\(String(format: "%02d", seconds))s"

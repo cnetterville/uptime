@@ -9,75 +9,90 @@ import SwiftUI
 
 struct AboutView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            // App Icon
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 64))
-                .foregroundStyle(.blue)
-            
-            // App Info
-            VStack(spacing: 8) {
-                Text("Uptime")
-                    .font(.title)
-                    .fontWeight(.bold)
+        ScrollView {
+            VStack(spacing: 24) {
+                // App Icon
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.blue)
+                    .padding(.top, 20)
                 
-                Text("Version 1.0.0")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                // App Info
+                VStack(spacing: 12) {
+                    Text("Uptime")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    Text("Version 1.0.0")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                }
                 
-                Text("Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            
-            // Description
-            VStack(spacing: 12) {
-                Text("A beautiful menubar app for tracking your Mac's uptime")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                // Description
+                VStack(spacing: 16) {
+                    Text("A beautiful menubar app for tracking your Mac's uptime")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 20)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    Text("Features include uptime history, milestone notifications, and customizable display formats.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 20)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 
-                Text("Features include uptime history, milestone notifications, and customizable display formats.")
-                    .font(.caption)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.tertiary)
-            }
-            
-            Divider()
-                .padding(.vertical)
-            
-            // Credits
-            VStack(spacing: 8) {
-                Text("© 2025 Curtis Netterville")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                Divider()
+                    .padding(.horizontal, 20)
                 
-                Text("Made with ❤️ using SwiftUI")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            
-            // System Info
-            VStack(spacing: 4) {
-                Text("System: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
-                    .font(.caption2)
-                    .foregroundStyle(.quaternary)
+                // Credits
+                VStack(spacing: 12) {
+                    Text("© 2025 Curtis Netterville")
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    
+                    HStack(spacing: 4) {
+                        Text("Made with")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        
+                        Text("❤️")
+                            .font(.subheadline)
+                        
+                        Text("using SwiftUI")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 
-                Text("Architecture: \(getArchitecture())")
-                    .font(.caption2)
-                    .foregroundStyle(.quaternary)
+                // System Info
+                VStack(spacing: 8) {
+                    Text("System: \(getSystemVersion())")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                    
+                    Text("Architecture: \(getArchitecture())")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                }
+                
+                // Close Button
+                Button("Close") {
+                    NSApplication.shared.keyWindow?.close()
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.bottom, 20)
             }
-            
-            Spacer()
-            
-            // Close Button
-            Button("Close") {
-                NSApplication.shared.keyWindow?.close()
-            }
-            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 10)
         }
-        .padding(30)
-        .frame(width: 350, height: 450)
+        .frame(width: 420, height: 580)
         .background(.ultraThinMaterial)
     }
     
@@ -89,6 +104,11 @@ struct AboutView: View {
         #else
         return "Unknown"
         #endif
+    }
+    
+    private func getSystemVersion() -> String {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
     }
 }
 

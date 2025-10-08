@@ -16,24 +16,31 @@ struct PreferencesView: View {
     @AppStorage("timeUnitFormat") private var timeUnitFormat: TimeUnit = .automatic
     @AppStorage("showMinutesInMenubar") private var showMinutesInMenubar = true
     @AppStorage("use24HourFormat") private var use24HourFormat = false
+    @AppStorage("menubarStyle") private var menubarStyle: MenubarStyle = .compact
+    @AppStorage("showSystemStats") private var showSystemStats = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Header
-            HStack {
-                Image(systemName: "gear")
-                    .font(.title2)
-                    .foregroundStyle(.primary)
+        ScrollView {
+            VStack(spacing: 24) {
+                // Header
+                HStack {
+                    Image(systemName: "gear")
+                        .font(.title2)
+                        .foregroundStyle(.primary)
+                    
+                    Text("Preferences")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
                 
-                Text("Preferences")
-                    .font(.headline)
-                    .fontWeight(.medium)
+                Divider()
+                    .padding(.horizontal, 20)
                 
-                Spacer()
-            }
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 20) {
                     // Startup section
                     PreferenceSection(title: "Startup") {
                         Toggle("Launch at login", isOn: $launchAtLogin)
@@ -42,9 +49,9 @@ struct PreferencesView: View {
                     
                     // Display section
                     PreferenceSection(title: "Display Format") {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 16) {
                             // Time unit format
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text("Time Format")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -66,84 +73,98 @@ struct PreferencesView: View {
                             Divider()
                             
                             // Show/hide options
-                            Toggle("Show minutes in menubar", isOn: $showMinutesInMenubar)
-                                .help("Include minutes in the compact menubar display")
-                            
-                            Toggle("Show arrow in menubar", isOn: $showArrow)
-                                .help("Display the up arrow (↑) indicator in the menubar")
-                            
-                            Toggle("24-hour format for boot time", isOn: $use24HourFormat)
-                                .help("Use 24-hour time format instead of AM/PM")
+                            VStack(spacing: 12) {
+                                Toggle("Show minutes in menubar", isOn: $showMinutesInMenubar)
+                                    .help("Include minutes in the compact menubar display")
+                                
+                                Toggle("Show arrow in menubar", isOn: $showArrow)
+                                    .help("Display the up arrow (↑) indicator in the menubar")
+                                
+                                Toggle("24-hour format for boot time", isOn: $use24HourFormat)
+                                    .help("Use 24-hour time format instead of AM/PM")
+                            }
                         }
                     }
                     
                     // Update frequency section
                     PreferenceSection(title: "Update Frequency") {
-                        HStack {
-                            Text("Update every:")
-                            Picker("Update Frequency", selection: $updateFrequency) {
-                                Text("1 second").tag(1.0)
-                                Text("5 seconds").tag(5.0)
-                                Text("30 seconds").tag(30.0)
-                                Text("1 minute").tag(60.0)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Update every:")
+                                Picker("Update Frequency", selection: $updateFrequency) {
+                                    Text("1 second").tag(1.0)
+                                    Text("5 seconds").tag(5.0)
+                                    Text("30 seconds").tag(30.0)
+                                    Text("1 minute").tag(60.0)
+                                }
+                                .pickerStyle(MenuPickerStyle())
                             }
-                            .pickerStyle(MenuPickerStyle())
+                            
+                            Text("Lower frequencies save battery but reduce accuracy")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                         }
-                        
-                        Text("Lower frequencies save battery but reduce accuracy")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
                     }
                     
                     // Notifications section
                     PreferenceSection(title: "Notifications") {
-                        Toggle("Milestone notifications", isOn: $milestoneNotifications)
-                            .help("Get notified when reaching uptime milestones (1 day, 1 week, etc.)")
-                        
-                        Text("Receive notifications for: 1 day, 1 week, 1 month, 3 months, 6 months, 1 year")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Toggle("Milestone notifications", isOn: $milestoneNotifications)
+                                .help("Get notified when reaching uptime milestones (1 day, 1 week, etc.)")
+                            
+                            Text("Receive notifications for: 1 day, 1 week, 1 month, 3 months, 6 months, 1 year")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     
-                    // Preview section
-                    PreferenceSection(title: "Preview") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Current formatting:")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            HStack {
-                                Text("Menubar:")
+                    // Appearance section
+                    PreferenceSection(title: "Appearance") {
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Menubar Style")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 
-                                Text(formatPreviewMenubar())
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .fontDesign(.monospaced)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                Picker("Menubar Style", selection: $menubarStyle) {
+                                    ForEach(MenubarStyle.allCases) { style in
+                                        VStack(alignment: .leading) {
+                                            Text(style.displayName)
+                                            Text(style.description)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .tag(style)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
                             }
+                            
+                            Divider()
+                            
+                            Toggle("Show system stats in popover", isOn: $showSystemStats)
+                                .help("Display CPU, memory, and disk usage in the popover")
                         }
                     }
                 }
-            }
-            
-            Spacer()
-            
-            // Close button
-            HStack {
-                Spacer()
-                Button("Close") {
-                    NSApplication.shared.keyWindow?.close()
+                .padding(.horizontal, 20)
+                
+                Spacer(minLength: 20)
+                
+                // Close button
+                HStack {
+                    Spacer()
+                    Button("Close") {
+                        NSApplication.shared.keyWindow?.close()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
         }
-        .padding(20)
-        .frame(width: 450, height: 500)
+        .frame(width: 480, height: 580)
         .background(.ultraThinMaterial)
     }
     
@@ -155,107 +176,21 @@ struct PreferencesView: View {
                 } else {
                     try SMAppService.mainApp.unregister()
                 }
+                print("Launch at login \(enabled ? "enabled" : "disabled")")
             } else {
-                // Fallback for older versions
-                print("Launch at login requires macOS 13.0 or later")
+                // Enhanced fallback for older versions
+                let helperBundleIdentifier = "com.curtisnet.Uptime.LaunchHelper"
+                if SMLoginItemSetEnabled(helperBundleIdentifier as CFString, enabled) {
+                    print("Launch at login \(enabled ? "enabled" : "disabled") via SMLoginItemSetEnabled")
+                } else {
+                    print("Failed to set launch at login")
+                }
             }
         } catch {
             print("Error setting launch at login: \(error.localizedDescription)")
-        }
-    }
-    
-    private func formatPreviewMenubar() -> String {
-        let arrow = showArrow ? "↑" : ""
-        let sampleUptime: TimeInterval = 356400 // 4 days, 3 hours, 0 minutes
-        
-        return formatTimeForDisplay(
-            uptime: sampleUptime,
-            format: timeUnitFormat,
-            includeSeconds: false,
-            includeMinutes: showMinutesInMenubar,
-            isCompact: true,
-            arrow: arrow
-        )
-    }
-    
-    private func formatPreviewPopover() -> String {
-        let sampleUptime: TimeInterval = 356400 // 4 days, 3 hours, 0 minutes
-        
-        return formatTimeForDisplay(
-            uptime: sampleUptime,
-            format: timeUnitFormat,
-            includeSeconds: false,
-            includeMinutes: true,
-            isCompact: false,
-            arrow: ""
-        )
-    }
-    
-    private func formatTimeForDisplay(uptime: TimeInterval, format: TimeUnit, includeSeconds: Bool, includeMinutes: Bool, isCompact: Bool, arrow: String) -> String {
-        let days = Int(uptime) / 86400
-        let hours = (Int(uptime) % 86400) / 3600
-        let minutes = (Int(uptime) % 3600) / 60
-        let seconds = Int(uptime) % 60
-        
-        let space = (isCompact && format == .compactFormat) ? "" : " "
-        let prefix = arrow.isEmpty ? (isCompact ? " " : "") : (isCompact ? " \(arrow)" : "")
-        
-        switch format {
-        case .automatic:
-            if days > 0 {
-                if includeSeconds {
-                    return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-                }
-            } else if hours > 0 {
-                if includeSeconds {
-                    return "\(prefix)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-                }
-            } else {
-                if includeSeconds {
-                    return "\(prefix)\(String(format: "%02d", minutes))m\(space)\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(String(format: "%02d", minutes))m"
-                }
-            }
-            
-        case .alwaysShowDays:
-            if includeSeconds {
-                return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
-            } else {
-                return "\(prefix)\(days)d\(space)\(String(format: "%02d", hours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-            }
-            
-        case .alwaysShowHours:
-            let totalHours = days * 24 + hours
-            if includeSeconds {
-                return "\(prefix)\(String(format: "%02d", totalHours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m\(space)" : "")\(String(format: "%02d", seconds))s"
-            } else {
-                return "\(prefix)\(String(format: "%02d", totalHours))h\(space)\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-            }
-            
-        case .compactFormat:
-            if days > 0 {
-                if includeSeconds {
-                    return "\(prefix)\(days)d\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(days)d\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-                }
-            } else if hours > 0 {
-                if includeSeconds {
-                    return "\(prefix)\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(String(format: "%02d", hours))h\(includeMinutes ? "\(String(format: "%02d", minutes))m" : "")"
-                }
-            } else {
-                if includeSeconds {
-                    return "\(prefix)\(String(format: "%02d", minutes))m\(String(format: "%02d", seconds))s"
-                } else {
-                    return "\(prefix)\(String(format: "%02d", minutes))m"
-                }
+            // Reset the toggle if it failed
+            DispatchQueue.main.async {
+                launchAtLogin = !enabled
             }
         }
     }
@@ -271,14 +206,14 @@ struct PreferenceSection<Content: View>: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
             
             content
         }
-        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
