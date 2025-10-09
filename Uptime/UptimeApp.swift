@@ -82,41 +82,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func statusBarButtonClicked(_ sender: NSStatusBarButton) {
         guard let event = NSApp.currentEvent else { return }
         
-        if event.type == .rightMouseUp {
-            // Right click - show context menu
-            showContextMenu()
-        } else {
-            // Left click - toggle popover
+        // Only handle left click - toggle popover
+        if event.type == .leftMouseUp {
             togglePopover()
-        }
-    }
-    
-    private func showContextMenu() {
-        let menu = NSMenu()
-        
-        let aboutItem = NSMenuItem(title: "About Uptime", action: #selector(openAbout), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let historyItem = NSMenuItem(title: "Uptime History...", action: #selector(openHistory), keyEquivalent: "h")
-        historyItem.target = self
-        menu.addItem(historyItem)
-        
-        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
-        prefsItem.target = self
-        menu.addItem(prefsItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let quitItem = NSMenuItem(title: "Quit Uptime", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-        
-        // Show the menu at the button location
-        if let button = statusItem?.button {
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button)
         }
     }
     
@@ -149,6 +117,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 onPreferencesAction: { [weak self] in
                     self?.popover?.performClose(nil)
                     self?.openPreferences()
+                },
+                onQuitAction: { [weak self] in
+                    self?.popover?.performClose(nil)
+                    self?.quitApp()
                 }
             )
         )

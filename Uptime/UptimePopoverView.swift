@@ -5,6 +5,7 @@ struct UptimePopoverView: View {
     @ObservedObject var systemMonitor: SystemMonitor
     let onHistoryAction: () -> Void
     let onPreferencesAction: () -> Void
+    let onQuitAction: () -> Void
     @AppStorage("showSystemStats") private var showSystemStats = false
     
     var body: some View {
@@ -87,13 +88,20 @@ struct UptimePopoverView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 
-                Spacer()
-                
                 Button("Preferences") {
                     onPreferencesAction()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                
+                Spacer()
+                
+                Button("Quit") {
+                    onQuitAction()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .foregroundStyle(.red)
             }
         }
         .padding(16)
@@ -187,6 +195,7 @@ struct StatRow: View {
         uptimeManager: UptimeManager(),
         systemMonitor: SystemMonitor(),
         onHistoryAction: {},
-        onPreferencesAction: {}
+        onPreferencesAction: {},
+        onQuitAction: {}
     )
 }
