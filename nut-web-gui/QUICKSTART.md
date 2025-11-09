@@ -28,13 +28,16 @@ The script will:
 ```bash
 # Install NUT
 sudo apt-get update
-sudo apt-get install -y nut nut-client nut-server
+sudo apt-get install -y nut nut-client nut-server python3-venv
 
-# Install Python dependencies
-pip3 install -r requirements.txt
+# Create virtual environment
+python3 -m venv venv
+
+# Install Python dependencies in venv
+./venv/bin/pip install -r requirements.txt
 
 # Run the app
-python3 app.py
+./venv/bin/python app.py
 ```
 
 ## First-Time Configuration

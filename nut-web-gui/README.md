@@ -51,10 +51,14 @@ Or if you have the files locally:
 cd nut-web-gui
 ```
 
-### 3. Install Python dependencies
+### 3. Create virtual environment and install dependencies
 
 ```bash
-pip3 install -r requirements.txt
+# Create virtual environment
+python3 -m venv venv
+
+# Install dependencies
+./venv/bin/pip install -r requirements.txt
 ```
 
 ### 4. Set up permissions
@@ -83,7 +87,7 @@ sudo chmod 644 /etc/nut/*.conf
 For testing and development:
 
 ```bash
-python3 app.py
+./venv/bin/python app.py
 ```
 
 The application will be available at `http://localhost:5000` or `http://<raspberry-pi-ip>:5000`
@@ -93,7 +97,7 @@ The application will be available at `http://localhost:5000` or `http://<raspber
 For production use with better performance and stability:
 
 ```bash
-gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
+./venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
 ```
 
 ### Run as a System Service
@@ -115,8 +119,8 @@ After=network.target nut-server.service
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/nut-web-gui
-Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/local/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
+Environment="PATH=/home/pi/nut-web-gui/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/pi/nut-web-gui/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
 Restart=always
 
 [Install]

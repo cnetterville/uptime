@@ -20,16 +20,20 @@ if [[ $EUID -eq 0 ]]; then
    exit 1
 fi
 
-echo "Step 1: Installing NUT (Network UPS Tools)..."
+echo "Step 1: Installing system packages..."
 sudo apt-get update
-sudo apt-get install -y nut nut-client nut-server
+sudo apt-get install -y nut nut-client nut-server python3-venv python3-pip
 
 echo ""
-echo "Step 2: Installing Python dependencies..."
-pip3 install --user -r requirements.txt
+echo "Step 2: Creating Python virtual environment..."
+python3 -m venv venv
 
 echo ""
-echo "Step 3: Setting up permissions..."
+echo "Step 3: Installing Python dependencies in virtual environment..."
+./venv/bin/pip install -r requirements.txt
+
+echo ""
+echo "Step 4: Setting up permissions..."
 
 # Add user to nut group
 sudo usermod -a -G nut $USER
@@ -51,10 +55,10 @@ sudo chmod 0440 /etc/sudoers.d/nut-web-gui
 sudo chmod 644 /etc/nut/*.conf 2>/dev/null || true
 
 echo ""
-echo "Step 4: Creating systemd service..."
+echo "Step 5: Creating systemd service..."
 
 INSTALL_DIR=$(pwd)
-GUNICORN_PATH=$(which gunicorn || echo "$HOME/.local/bin/gunicorn")
+GUNICORN_PATH="$INSTALL_DIR/venv/bin/gunicorn"
 
 sudo tee /etc/systemd/system/nut-web-gui.service > /dev/null <<EOF
 [Unit]
@@ -65,8 +69,8 @@ After=network.target nut-server.service
 Type=simple
 User=$USER
 WorkingDirectory=$INSTALL_DIR
-Environment="PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$GUNICORN_PATH --bind 0.0.0.0:5000 --workers 2 app:app
+Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=$INSTALL_DIR/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
 Restart=always
 
 [Install]
@@ -74,7 +78,7 @@ WantedBy=multi-user.target
 EOF
 
 echo ""
-echo "Step 5: Enabling and starting service..."
+echo "Step 6: Enabling and starting service..."
 sudo systemctl daemon-reload
 sudo systemctl enable nut-web-gui
 sudo systemctl start nut-web-gui
