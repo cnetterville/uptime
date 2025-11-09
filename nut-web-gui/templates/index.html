@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NUT Web GUI - Network UPS Tools</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-bolt"></i>
+            <span>NUT Web GUI</span>
+        </div>
+        <div class="nav-links">
+            <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="#ups-list" class="nav-link" data-page="ups-list">
+                <i class="fas fa-plug"></i> UPS Devices
+            </a>
+            <a href="#configuration" class="nav-link" data-page="configuration">
+                <i class="fas fa-cog"></i> Configuration
+            </a>
+            <a href="#logs" class="nav-link" data-page="logs">
+                <i class="fas fa-file-alt"></i> Logs
+            </a>
+            <a href="#system" class="nav-link" data-page="system">
+                <i class="fas fa-info-circle"></i> System
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Dashboard Page -->
+        <div id="dashboard" class="page active">
+            <h1>Dashboard</h1>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-server"></i>
+                        <h3>Service Status</h3>
+                    </div>
+                    <div id="service-status" class="card-body">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-desktop"></i>
+                        <h3>System Information</h3>
+                    </div>
+                    <div id="system-info" class="card-body">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-plug"></i>
+                    <h3>Connected UPS Devices</h3>
+                </div>
+                <div id="ups-overview" class="card-body">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPS List Page -->
+        <div id="ups-list" class="page">
+            <h1>UPS Devices</h1>
+            <div id="ups-devices" class="card">
+                <div class="card-body">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Page -->
+        <div id="configuration" class="page">
+            <h1>Configuration</h1>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-edit"></i>
+                    <h3>UPS Configuration (ups.conf)</h3>
+                </div>
+                <div class="card-body">
+                    <textarea id="ups-config" rows="20" style="width: 100%; font-family: monospace;"></textarea>
+                    <div class="button-group">
+                        <button onclick="saveConfig()" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Configuration
+                        </button>
+                        <button onclick="loadConfig()" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> Reload
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-list"></i>
+                    <h3>Available Drivers</h3>
+                </div>
+                <div id="drivers-list" class="card-body">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Page -->
+        <div id="logs" class="page">
+            <h1>System Logs</h1>
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>Recent NUT Logs</h3>
+                    <button onclick="refreshLogs()" class="btn btn-small">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="logs-content" class="card-body">
+                    <pre class="logs"><div class="loading">Loading...</div></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Page -->
+        <div id="system" class="page">
+            <h1>System Control</h1>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-power-off"></i>
+                    <h3>Service Control</h3>
+                </div>
+                <div class="card-body">
+                    <div class="service-controls">
+                        <div class="service-item">
+                            <span>NUT Server</span>
+                            <div class="button-group">
+                                <button onclick="serviceAction('nut-server', 'start')" class="btn btn-success">
+                                    <i class="fas fa-play"></i> Start
+                                </button>
+                                <button onclick="serviceAction('nut-server', 'stop')" class="btn btn-danger">
+                                    <i class="fas fa-stop"></i> Stop
+                                </button>
+                                <button onclick="serviceAction('nut-server', 'restart')" class="btn btn-warning">
+                                    <i class="fas fa-redo"></i> Restart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
